@@ -6,12 +6,18 @@ jQuery(document).ready(function($) {
     var $sliderContainer = $('#floating-slider-pro-container');
     var $sliderImages = $sliderContainer.find('.fs-slider-image');
 
+    // Only proceed if the slider container and images exist
+    if (!$sliderContainer.length || !$sliderImages.length) {
+        return;
+    }
+
+    // Initialize display state for all images: only the first one is 'active'
+    $sliderImages.removeClass('active').hide(); // Hide all initially
+    $sliderImages.eq(0).addClass('active').show(); // Show only the first one
+
     // Show the slider after a delay
     setTimeout(function() {
         $sliderContainer.fadeIn(500, function() {
-            // Ensure the first image is always active and visible initially
-            $sliderImages.removeClass('active inactive').eq(0).addClass('active').show();
-            // Only start slideshow if there's more than one slide
             if (totalSlides > 1) {
                 startSlideshow();
             }
@@ -40,38 +46,36 @@ jQuery(document).ready(function($) {
         currentSlide = (currentSlide + 1) % totalSlides;
         var $nextImg = $sliderImages.eq(currentSlide);
 
-        // Ensure current and next images exist
-        if ($currentImg.length === 0 || $nextImg.length === 0) {
+        if (!$currentImg.length || !$nextImg.length) {
+            console.error('Slider error: Cannot find current or next image for transition.');
             clearInterval(slideInterval);
-            console.error('Slider error: Image not found for transition.');
             return;
         }
 
         switch(animationType) {
             case 'fade':
                 $currentImg.fadeOut(300, function() {
-                    $(this).removeClass('active inactive'); // Remove classes after fadeOut
+                    $(this).removeClass('active'); // Remove active after fadeOut
                 });
                 $nextImg.fadeIn(300, function() {
-                    $(this).addClass('active').removeClass('inactive'); // Add active after fadeIn
+                    $(this).addClass('active'); // Add active after fadeIn
                 });
                 break;
 
             case 'slide':
-                // Hide all and reset positions first
-                $sliderImages.removeClass('active').css({'left': '0', 'top': '0', 'transform': 'translateX(0)'}).hide();
+                // Set initial positions for current and next image
+                $currentImg.css({ 'position': 'absolute', 'left': '0%', 'top': '0', 'display': 'block' });
+                $nextImg.css({ 'position': 'absolute', 'left': '100%', 'top': '0', 'display': 'block' });
 
-                // Current image moves out to the left
-                $currentImg.css({'position': 'absolute', 'display': 'block'})
-                    .animate({ left: '-100%' }, 500, 'swing', function() {
-                        $(this).hide().css('left', '0'); // Reset position after hide
-                    });
+                // Animate current image out
+                $currentImg.animate({ left: '-100%' }, 500, 'swing', function() {
+                    $(this).removeClass('active').hide().css('left', '0%'); // Reset for next cycle
+                });
 
-                // Next image slides in from the right
-                $nextImg.css({'position': 'absolute', 'display': 'block', 'left': '100%'})
-                    .animate({ left: '0%' }, 500, 'swing', function() {
-                        $(this).addClass('active');
-                    });
+                // Animate next image in
+                $nextImg.animate({ left: '0%' }, 500, 'swing', function() {
+                    $(this).addClass('active');
+                });
                 break;
 
             case 'zoom':
@@ -82,7 +86,7 @@ jQuery(document).ready(function($) {
                     left: '50%',
                     opacity: 0
                 }, 300, function() {
-                    $(this).removeClass('active inactive').hide().css({ // Reset to original state
+                    $(this).removeClass('active').hide().css({ // Reset to original state
                         width: '100%',
                         height: '100%',
                         top: '0%',
@@ -103,14 +107,18 @@ jQuery(document).ready(function($) {
                         left: '0%',
                         opacity: 1
                     }, 300, function() {
-                        $(this).addClass('active').removeClass('inactive');
+                        $(this).addClass('active');
                     });
                 });
                 break;
 
             default: // Fallback to fade
-                $currentImg.fadeOut(300);
-                $nextImg.fadeIn(300);
+                $currentImg.fadeOut(300, function() {
+                    $(this).removeClass('active');
+                });
+                $nextImg.fadeIn(300, function() {
+                    $(this).addClass('active');
+                });
                 break;
         }
     }
@@ -121,7 +129,7 @@ jQuery(document).ready(function($) {
             clearInterval(slideInterval);
         },
         function() {
-            if (totalSlides > 1) { // Only restart if there's more than one slide
+            if (totalSlides > 1) {
                 startSlideshow();
             }
         }
@@ -129,28 +137,8 @@ jQuery(document).ready(function($) {
 
     // Close button functionality
     $('#fs-slider-close').on('click', function() {
-        $('#floating-slider-pro-container').fadeOut(300, function() {
+        $sliderContainer.fadeOut(300, function() {
             clearInterval(slideInterval); // Stop slideshow when closed
         });
     });
-
-    // Dynamic resizing for mobile
-    function applyMobileStyles() {
-        if (window.innerWidth <= 767) {
-            $('#floating-slider-pro-container').css({
-                'width': floatingSliderData.mobileWidth + 'px',
-                'height': floatingSliderData.mobileHeight + 'px'
-            });
-        } else {
-            // Revert to desktop sizes if screen gets larger
-            $('#floating-slider-pro-container').css({
-                'width': 'auto', // CSS will handle based on settings
-                'height': 'auto'
-            });
-        }
-    }
-
-    // Apply styles on load and resize
-    applyMobileStyles();
-    $(window).on('resize', applyMobileStyles);
 });

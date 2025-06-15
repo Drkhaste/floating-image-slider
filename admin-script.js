@@ -8,11 +8,11 @@ jQuery(document).ready(function($) {
             if ($(this).data('alpha') && ui.color.alpha() < 1 && !newColor.includes('rgba')) {
                 newColor = ui.color.toRgbString();
             }
-            $(this).val(newColor);
+            $(this).val(newColor).trigger('change'); // Trigger change for instant preview if needed
         },
         clear: function() {
             // Clears the value if the clear button is clicked
-            $(this).val('');
+            $(this).val('').trigger('change');
         }
     });
 
@@ -41,14 +41,17 @@ jQuery(document).ready(function($) {
             step: step,
             slide: function(event, ui) {
                 $input.val(ui.value);
+                // Trigger change event so form is marked as dirty if needed
+                $input.trigger('change');
             }
         });
 
+        // Update slider when input changes manually
         $input.on('input change', function() {
             var val = parseFloat($(this).val());
             if (isNaN(val)) val = min; // Default if input is empty or invalid
-            if (val < min) val = min;
-            if (val > max) val = max;
+            if (val < min) val = val; // No need to clamp here, slider does it
+            if (val > max) val = max; // No need to clamp here, slider does it
             $(this).val(val); // Update input field (clamped)
             $sliderDiv.slider('value', val); // Update slider
         });
@@ -71,8 +74,8 @@ jQuery(document).ready(function($) {
             var attachment = frame.state().get('selection').first().toJSON();
             var linkUrl = prompt(floatingSliderAjax.messages.enter_image_link, attachment.url);
 
-            if (linkUrl !== null) {
-                $('#no-images-message').remove();
+            if (linkUrl !== null) { // If user didn't cancel the prompt
+                $('#no-images-message').remove(); // Remove "No images" message if present
 
                 $.ajax({
                     url: floatingSliderAjax.ajaxurl,
@@ -81,7 +84,7 @@ jQuery(document).ready(function($) {
                         action: 'fs_upload_slider_image',
                         attachment_id: attachment.id,
                         link_url: linkUrl,
-                        nonce: floatingSliderAjax.nonce
+                        nonce: floatingSliderAjax.nonce // Ensure nonce is included
                     },
                     success: function(response) {
                         if (response.success) {
@@ -109,8 +112,9 @@ jQuery(document).ready(function($) {
                             alert(response.data.message);
                         }
                     },
-                    error: function() {
-                        alert('Error uploading image.');
+                    error: function(xhr, status, error) {
+                        console.error('AJAX Error:', status, error, xhr.responseText);
+                        alert('Error uploading image: ' + (xhr.responseJSON ? xhr.responseJSON.data.message : 'Unknown error. Check console for details.'));
                     }
                 });
             }
@@ -129,26 +133,29 @@ jQuery(document).ready(function($) {
                 return $(this).data('attachment-id');
             }).get();
 
+            // Re-index data-index attribute after sorting
+            $(this).children('.fs-image-item').each(function(index) {
+                $(this).data('index', index);
+            });
+
             $.ajax({
                 url: floatingSliderAjax.ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'fs_update_slider_image_order',
                     order: imageOrder,
-                    nonce: floatingSliderAjax.nonce
+                    nonce: floatingSliderAjax.nonce // Ensure nonce is included
                 },
                 success: function(response) {
                     if (response.success) {
-                        $('#fs-slider-images-list').children('.fs-image-item').each(function(index) {
-                            $(this).data('index', index);
-                        });
                         console.log(response.data.message);
                     } else {
                         alert(response.data.message);
                     }
                 },
-                error: function() {
-                    alert('Error updating image order.');
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error, xhr.responseText);
+                    alert('Error updating image order: ' + (xhr.responseJSON ? xhr.responseJSON.data.message : 'Unknown error. Check console for details.'));
                 }
             });
         }
@@ -158,7 +165,7 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.fs-delete-image-btn', function() {
         if (confirm(floatingSliderAjax.messages.confirm_delete)) {
             var $item = $(this).closest('.fs-image-item');
-            var index = $item.data('index');
+            var index = $item.data('index'); // Use data-index to get the current order index
 
             $.ajax({
                 url: floatingSliderAjax.ajaxurl,
@@ -166,12 +173,13 @@ jQuery(document).ready(function($) {
                 data: {
                     action: 'fs_delete_slider_image',
                     index: index,
-                    nonce: floatingSliderAjax.nonce
+                    nonce: floatingSliderAjax.nonce // Ensure nonce is included
                 },
                 success: function(response) {
                     if (response.success) {
                         $item.fadeOut(300, function() {
                             $(this).remove();
+                            // Re-index all remaining items
                             $('#fs-slider-images-list').children('.fs-image-item').each(function(idx) {
                                 $(this).data('index', idx);
                             });
@@ -179,12 +187,14 @@ jQuery(document).ready(function($) {
                                 $('#fs-slider-images-list').append('<p id="no-images-message">' + floatingSliderAjax.messages.no_images_yet + '</p>');
                             }
                         });
+                        console.log(response.data.message);
                     } else {
                         alert(response.data.message);
                     }
                 },
-                error: function() {
-                    alert('Error deleting image.');
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error, xhr.responseText);
+                    alert('Error deleting image: ' + (xhr.responseJSON ? xhr.responseJSON.data.message : 'Unknown error. Check console for details.'));
                 }
             });
         }
@@ -212,7 +222,7 @@ jQuery(document).ready(function($) {
                 action: 'fs_update_slider_image_link',
                 index: index,
                 link: newLink,
-                nonce: floatingSliderAjax.nonce
+                nonce: floatingSliderAjax.nonce // Ensure nonce is included
             },
             success: function(response) {
                 if (response.success) {
@@ -225,8 +235,9 @@ jQuery(document).ready(function($) {
                     alert(response.data.message);
                 }
             },
-            error: function() {
-                alert('Error updating image link.');
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', status, error, xhr.responseText);
+                alert('Error updating image link: ' + (xhr.responseJSON ? xhr.responseJSON.data.message : 'Unknown error. Check console for details.'));
             }
         });
     });
@@ -235,8 +246,9 @@ jQuery(document).ready(function($) {
     $('.nav-tab-wrapper a').on('click', function(e) {
         e.preventDefault();
         var tab_id = $(this).attr('href').split('tab=')[1];
-        if (!tab_id) tab_id = 'general';
+        if (!tab_id) tab_id = 'general'; // Default to general tab
 
+        // Update URL hash to maintain tab state on refresh
         history.pushState(null, null, '?page=floating-slider&tab=' + tab_id);
 
         $('.tab-content').hide();
@@ -246,8 +258,12 @@ jQuery(document).ready(function($) {
         $(this).addClass('nav-tab-active');
     });
 
-    var currentTab = new URLSearchParams(window.location.search).get('tab');
-    if (!currentTab) currentTab = 'general';
-    $('.nav-tab-wrapper a[href$="tab=' + currentTab + '"]').addClass('nav-tab-active');
-    $('#' + currentTab + '-tab-content').show();
+    // Set active tab on page load based on URL parameter
+    var urlParams = new URLSearchParams(window.location.search);
+    var initialTab = urlParams.get('tab');
+    if (!initialTab) {
+        initialTab = 'general'; // Default tab
+    }
+    $('.nav-tab-wrapper a[href*="tab=' + initialTab + '"]').addClass('nav-tab-active');
+    $('#' + initialTab + '-tab-content').show();
 });
