@@ -9,7 +9,7 @@
 }
 
 .form-table th {
-    width: 200px; /* Adjust as needed for alignment */
+    width: 200px;
     padding-top: 15px;
     padding-bottom: 15px;
 }
@@ -19,11 +19,18 @@
     padding-bottom: 15px;
 }
 
-.form-table input[type="number"],
+/* Specific styling for the numeric input fields, not the wrappers */
+.form-table input[type="number"] {
+    width: 80px; /* Make number input smaller */
+    margin-right: 10px; /* Space from the slider */
+    margin-bottom: 0; /* Remove bottom margin */
+    display: inline-block; /* Ensure it respects width */
+    vertical-align: middle; /* Align with slider */
+}
+
 .form-table input[type="text"],
 .form-table select {
     min-width: 150px;
-    margin-right: 10px;
     margin-bottom: 5px;
 }
 
@@ -36,54 +43,40 @@
 
 /* Numeric Slider Wrapper */
 .numeric-slider-wrapper {
-    display: inline-flex;
-    align-items: center;
+    display: flex; /* Use flex for alignment of input and slider */
+    align-items: center; /* Vertically center items */
     gap: 10px; /* Space between input and slider */
-    margin-bottom: 5px;
+    margin-bottom: 5px; /* Space between rows */
 }
 
-.numeric-slider-wrapper input[type="number"] {
-    width: 80px; /* Make number input smaller */
-    margin-bottom: 0; /* Remove bottom margin */
-}
-
-.numeric-slider-wrapper .slider {
+/* Styling for the jQuery UI Slider itself */
+.numeric-slider-wrapper .ui-slider {
     flex-grow: 1; /* Allow slider to take available space */
-    width: 150px; /* Default width for the slider track */
+    width: 150px; /* Default width, will expand with flex-grow */
     height: 8px; /* Height of the slider track */
     background: #d3d3d3;
-    outline: none;
-    opacity: 0.7;
-    transition: opacity .2s;
-    -webkit-appearance: none; /* Remove default styling */
-    appearance: none;
+    border: none;
     border-radius: 5px;
+    position: relative; /* Needed for handle positioning */
 }
 
-.numeric-slider-wrapper .slider:hover {
-    opacity: 1;
-}
-
-.numeric-slider-wrapper .slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
+.numeric-slider-wrapper .ui-slider .ui-slider-handle {
     width: 20px;
     height: 20px;
     border-radius: 50%;
     background: #0073aa;
-    cursor: pointer;
+    cursor: grab;
     box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    border: none;
+    outline: none; /* Remove outline on focus */
+    position: absolute; /* Allows precise positioning */
+    top: -6px; /* Adjust to center handle vertically on track */
+    margin-left: -10px; /* Center handle horizontally */
 }
 
-.numeric-slider-wrapper .slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #0073aa;
-    cursor: pointer;
-    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+.numeric-slider-wrapper .ui-slider .ui-slider-handle:active {
+    cursor: grabbing;
 }
-
 
 /* Tab Content Styling */
 .tab-content-wrapper {

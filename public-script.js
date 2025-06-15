@@ -8,14 +8,27 @@ jQuery(document).ready(function($) {
 
     // Show the slider after a delay
     setTimeout(function() {
-        $sliderContainer.fadeIn(500);
-        startSlideshow();
+        $sliderContainer.fadeIn(500, function() {
+            // Ensure the first image is always active and visible initially
+            $sliderImages.removeClass('active inactive').eq(0).addClass('active').show();
+            // Only start slideshow if there's more than one slide
+            if (totalSlides > 1) {
+                startSlideshow();
+            }
+        });
     }, floatingSliderData.delayShow);
 
-    function startSlideshow() {
-        if (totalSlides <= 1) return; // No need for slideshow if 1 or less images
+    // Click handler for images to open link
+    $sliderImages.on('click', function() {
+        var link = $(this).data('link');
+        if (link) {
+            window.open(link, '_blank');
+        }
+    });
 
-        // Clear any existing interval to prevent duplicates
+    function startSlideshow() {
+        if (totalSlides <= 1) return;
+
         clearInterval(slideInterval);
         slideInterval = setInterval(function() {
             nextSlide();
@@ -27,58 +40,53 @@ jQuery(document).ready(function($) {
         currentSlide = (currentSlide + 1) % totalSlides;
         var $nextImg = $sliderImages.eq(currentSlide);
 
+        // Ensure current and next images exist
         if ($currentImg.length === 0 || $nextImg.length === 0) {
-            // Handle case where images might be removed or not loaded correctly
-            clearInterval(slideInterval); // Stop slideshow if issues
+            clearInterval(slideInterval);
+            console.error('Slider error: Image not found for transition.');
             return;
         }
 
-        // Apply animations based on type
         switch(animationType) {
             case 'fade':
-                $currentImg.fadeOut(300);
-                $nextImg.fadeIn(300);
+                $currentImg.fadeOut(300, function() {
+                    $(this).removeClass('active inactive'); // Remove classes after fadeOut
+                });
+                $nextImg.fadeIn(300, function() {
+                    $(this).addClass('active').removeClass('inactive'); // Add active after fadeIn
+                });
                 break;
 
             case 'slide':
-                // Initial positioning for slide animation
-                $sliderImages.css({
-                    'position': 'absolute',
-                    'top': '0',
-                    'left': '0',
-                    'transform': 'translateX(0)' // Reset transform for all
-                }).hide();
+                // Hide all and reset positions first
+                $sliderImages.removeClass('active').css({'left': '0', 'top': '0', 'transform': 'translateX(0)'}).hide();
 
-                // Prepare next image to slide in from right (or left, depending on direction)
-                $nextImg.css({
-                    'transform': 'translateX(100%)'
-                }).show();
+                // Current image moves out to the left
+                $currentImg.css({'position': 'absolute', 'display': 'block'})
+                    .animate({ left: '-100%' }, 500, 'swing', function() {
+                        $(this).hide().css('left', '0'); // Reset position after hide
+                    });
 
-                // Animate current image out to the left and next image in from the right
-                $currentImg.css({'position': 'absolute', 'left': '0'}).show().animate({
-                    left: '-100%'
-                }, 500, 'easeOutExpo', function() {
-                    $(this).hide().css('left', '0'); // Reset current image position after it's hidden
-                });
-
-                $nextImg.css({'position': 'absolute', 'left': '0'}).show().animate({
-                    transform: 'translateX(0%)'
-                }, 500, 'easeOutExpo');
+                // Next image slides in from the right
+                $nextImg.css({'position': 'absolute', 'display': 'block', 'left': '100%'})
+                    .animate({ left: '0%' }, 500, 'swing', function() {
+                        $(this).addClass('active');
+                    });
                 break;
 
             case 'zoom':
-                $currentImg.removeClass('active').animate({
+                $currentImg.animate({
                     width: '0%',
                     height: '0%',
                     top: '50%',
                     left: '50%',
                     opacity: 0
                 }, 300, function() {
-                    $(this).hide().css({ // Reset to original state after animation
+                    $(this).removeClass('active inactive').hide().css({ // Reset to original state
                         width: '100%',
                         height: '100%',
-                        top: '0',
-                        left: '0',
+                        top: '0%',
+                        left: '0%',
                         opacity: 1
                     });
                     $nextImg.css({
@@ -86,25 +94,25 @@ jQuery(document).ready(function($) {
                         height: '0%',
                         top: '50%',
                         left: '50%',
-                        opacity: 0
-                    }).show().animate({
+                        opacity: 0,
+                        display: 'block' // Show to start animation
+                    }).animate({
                         width: '100%',
                         height: '100%',
-                        top: '0',
-                        left: '0',
+                        top: '0%',
+                        left: '0%',
                         opacity: 1
-                    }, 300).addClass('active');
+                    }, 300, function() {
+                        $(this).addClass('active').removeClass('inactive');
+                    });
                 });
                 break;
 
-            default: // Fallback to fade if animationType is unknown
+            default: // Fallback to fade
                 $currentImg.fadeOut(300);
                 $nextImg.fadeIn(300);
                 break;
         }
-        // Update active class for current and next image (important for transitions)
-        $currentImg.removeClass('active');
-        $nextImg.addClass('active');
     }
 
     // Pause slideshow on hover
@@ -113,14 +121,36 @@ jQuery(document).ready(function($) {
             clearInterval(slideInterval);
         },
         function() {
-            startSlideshow();
+            if (totalSlides > 1) { // Only restart if there's more than one slide
+                startSlideshow();
+            }
         }
     );
 
-    // Close button functionality - now directly handles click
+    // Close button functionality
     $('#fs-slider-close').on('click', function() {
         $('#floating-slider-pro-container').fadeOut(300, function() {
-            // Optional: clearInterval(slideInterval); if you want to stop it permanently after close
+            clearInterval(slideInterval); // Stop slideshow when closed
         });
     });
+
+    // Dynamic resizing for mobile
+    function applyMobileStyles() {
+        if (window.innerWidth <= 767) {
+            $('#floating-slider-pro-container').css({
+                'width': floatingSliderData.mobileWidth + 'px',
+                'height': floatingSliderData.mobileHeight + 'px'
+            });
+        } else {
+            // Revert to desktop sizes if screen gets larger
+            $('#floating-slider-pro-container').css({
+                'width': 'auto', // CSS will handle based on settings
+                'height': 'auto'
+            });
+        }
+    }
+
+    // Apply styles on load and resize
+    applyMobileStyles();
+    $(window).on('resize', applyMobileStyles);
 });

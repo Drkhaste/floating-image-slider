@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Floating Professional Slider
  * Description: Floating image slider with full customization options.
- * Version: 1.2
+ * Version: 1.3
  * Author: DrKhaste
  * Text Domain: floating-slider-pro
  * Domain Path: /languages
@@ -47,18 +47,20 @@ class FloatingSliderPlugin {
             'specific_pages'        => array(),
             'width'                 => 300,
             'height'                => 200,
+            'mobile_width'          => 200, // New default for mobile
+            'mobile_height'         => 150, // New default for mobile
             'position_horizontal'   => 'right',
             'position_vertical'     => 'center',
             'horizontal_offset'     => 20,
             'vertical_offset'       => 0,
             'images'                => array(),
-            'close_button_size'     => 30, // Increased default size for better clickability
+            'close_button_size'     => 30,
             'close_button_color'    => '#ffffff',
             'close_button_bg'       => '#ff0000',
             'close_button_pos_h'    => 'right',
-            'close_button_offset_h' => -15, // Adjusted offset
+            'close_button_offset_h' => -15,
             'close_button_pos_v'    => 'top',
-            'close_button_offset_v' => -15, // Adjusted offset
+            'close_button_offset_v' => -15,
             'animation_type'        => 'fade',
             'slide_duration'        => 3000,
             'delay_show'            => 2000,
@@ -106,6 +108,8 @@ class FloatingSliderPlugin {
         $output['specific_pages']        = isset($input['specific_pages']) ? array_map('intval', (array) $input['specific_pages']) : array();
         $output['width']                 = intval($input['width']);
         $output['height']                = intval($input['height']);
+        $output['mobile_width']          = intval($input['mobile_width']); // Sanitize new mobile setting
+        $output['mobile_height']         = intval($input['mobile_height']); // Sanitize new mobile setting
         $output['position_horizontal']   = sanitize_text_field($input['position_horizontal']);
         $output['position_vertical']     = sanitize_text_field($input['position_vertical']);
         $output['horizontal_offset']     = intval($input['horizontal_offset']);
@@ -123,10 +127,9 @@ class FloatingSliderPlugin {
         $output['border_theme']          = sanitize_text_field($input['border_theme']);
         $output['border_radius']         = intval($input['border_radius']);
         $output['shadow_blur']           = intval($input['shadow_blur']);
-        $output['shadow_color']          = sanitize_text_field($input['shadow_color']); // wpColorPicker handles various formats
+        $output['shadow_color']          = sanitize_text_field($input['shadow_color']);
         $output['image_fit']             = sanitize_text_field($input['image_fit']);
 
-        // Images are handled via AJAX, so they are retrieved from current option
         if (!isset($output['images'])) {
             $output['images'] = array();
         }
@@ -146,18 +149,16 @@ class FloatingSliderPlugin {
             return;
         }
 
-        // Enqueue WordPress media uploader
         wp_enqueue_media();
-        // Enqueue WordPress color picker
         wp_enqueue_style('wp-color-picker');
         wp_enqueue_script('wp-color-picker');
-        // Enqueue jQuery UI Sortable for image reordering
         wp_enqueue_script('jquery-ui-sortable');
+        wp_enqueue_script('jquery-ui-slider'); // Enqueue jQuery UI Slider
 
         wp_enqueue_script(
             'floating-slider-admin-script',
             plugin_dir_url(__FILE__) . 'admin-script.js',
-            array('jquery', 'wp-color-picker', 'jquery-ui-sortable'),
+            array('jquery', 'wp-color-picker', 'jquery-ui-sortable', 'jquery-ui-slider'), // Add jquery-ui-slider dependency
             null,
             true
         );
@@ -178,7 +179,7 @@ class FloatingSliderPlugin {
                 'messages' => array(
                     'enter_image_link' => __('Please enter image link:', 'floating-slider-pro'),
                     'confirm_delete'   => __('Are you sure you want to delete this image?', 'floating-slider-pro'),
-                    'no_images_yet'    => __('No images added yet. Click "Add Image" to start.', 'floating-slider-pro'), // Added for UI message
+                    'no_images_yet'    => __('No images added yet. Click "Add Image" to start.', 'floating-slider-pro'),
                 )
             )
         );
@@ -194,7 +195,6 @@ class FloatingSliderPlugin {
             return;
         }
 
-        // Check page display conditions
         if ($settings['display_pages'] == 'specific') {
             $current_page_id = get_queried_object_id();
             if (!in_array($current_page_id, $settings['specific_pages'])) {
@@ -218,6 +218,8 @@ class FloatingSliderPlugin {
                 'slideDuration' => $settings['slide_duration'],
                 'animationType' => $settings['animation_type'],
                 'totalSlides'   => count($settings['images']),
+                'mobileWidth'   => $settings['mobile_width'], // Pass mobile settings to public script
+                'mobileHeight'  => $settings['mobile_height'], // Pass mobile settings to public script
             )
         );
     }
@@ -240,9 +242,8 @@ class FloatingSliderPlugin {
             $settings['images'] = array();
         }
 
-        // Get image URL suitable for display (e.g., medium size if available)
         $image_url = wp_get_attachment_image_url($attachment_id, 'medium');
-        if (!$image_url) { // Fallback to full if medium not available
+        if (!$image_url) {
             $image_url = wp_get_attachment_url($attachment_id);
         }
 
@@ -280,7 +281,7 @@ class FloatingSliderPlugin {
 
         if (isset($settings['images'][$index])) {
             unset($settings['images'][$index]);
-            $settings['images'] = array_values($settings['images']); // Re-index array
+            $settings['images'] = array_values($settings['images']);
             update_option('floating_slider_settings', $settings);
             wp_send_json_success(array('message' => __('Image deleted successfully.', 'floating-slider-pro')));
         } else {
@@ -302,13 +303,11 @@ class FloatingSliderPlugin {
         $settings = get_option('floating_slider_settings', array());
         $ordered_images = array();
 
-        // Create a map from old image ID to its data
         $image_map = [];
         foreach ($settings['images'] as $image) {
             $image_map[$image['id']] = $image;
         }
 
-        // Reconstruct the images array based on the new order of IDs
         foreach ($new_order_ids as $image_id) {
             if (isset($image_map[$image_id])) {
                 $ordered_images[] = $image_map[$image_id];
@@ -351,8 +350,9 @@ class FloatingSliderPlugin {
         $settings = get_option('floating_slider_settings', array());
         $pages = get_pages();
 
-        // Ensure default values are set for new settings
         $settings = wp_parse_args($settings, array(
+            'mobile_width'          => 200,
+            'mobile_height'         => 150,
             'close_button_pos_h'    => 'right',
             'close_button_offset_h' => -15,
             'close_button_pos_v'    => 'top',
@@ -373,7 +373,6 @@ class FloatingSliderPlugin {
             <form method="post" action="options.php">
                 <?php
                 settings_fields('floating_slider_group');
-                // do_settings_sections('floating_slider_group'); // This line is not needed when using custom rendering per tab
 
                 $current_tab = isset($_GET['tab']) ? $_GET['tab'] : 'general';
 
@@ -438,12 +437,31 @@ class FloatingSliderPlugin {
             </tr>
 
             <tr>
-                <th scope="row"><?php esc_html_e('Slider Dimensions', 'floating-slider-pro'); ?></th>
+                <th scope="row"><?php esc_html_e('Desktop Slider Dimensions', 'floating-slider-pro'); ?></th>
                 <td>
                     <label for="floating_slider_width"><?php esc_html_e('Width:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_width" name="floating_slider_settings[width]" value="<?php echo esc_attr($settings['width']); ?>" min="50" max="1000" class="numeric-slider-input" data-min="50" data-max="1000" data-step="1" /> px<br>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_width" name="floating_slider_settings[width]" value="<?php echo esc_attr($settings['width']); ?>" min="50" max="1000" class="numeric-slider-input" data-min="50" data-max="1000" data-step="1" /> px
+                    </div><br>
                     <label for="floating_slider_height"><?php esc_html_e('Height:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_height" name="floating_slider_settings[height]" value="<?php echo esc_attr($settings['height']); ?>" min="50" max="1000" class="numeric-slider-input" data-min="50" data-max="1000" data-step="1" /> px
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_height" name="floating_slider_settings[height]" value="<?php echo esc_attr($settings['height']); ?>" min="50" max="1000" class="numeric-slider-input" data-min="50" data-max="1000" data-step="1" /> px
+                    </div>
+                </td>
+            </tr>
+
+            <tr>
+                <th scope="row"><?php esc_html_e('Mobile Slider Dimensions', 'floating-slider-pro'); ?></th>
+                <td>
+                    <p class="description"><?php esc_html_e('These settings apply on screens smaller than 768px.', 'floating-slider-pro'); ?></p>
+                    <label for="floating_slider_mobile_width"><?php esc_html_e('Mobile Width:', 'floating-slider-pro'); ?></label>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_mobile_width" name="floating_slider_settings[mobile_width]" value="<?php echo esc_attr($settings['mobile_width']); ?>" min="50" max="500" class="numeric-slider-input" data-min="50" data-max="500" data-step="1" /> px
+                    </div><br>
+                    <label for="floating_slider_mobile_height"><?php esc_html_e('Mobile Height:', 'floating-slider-pro'); ?></label>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_mobile_height" name="floating_slider_settings[mobile_height]" value="<?php echo esc_attr($settings['mobile_height']); ?>" min="50" max="500" class="numeric-slider-input" data-min="50" data-max="500" data-step="1" /> px
+                    </div>
                 </td>
             </tr>
 
@@ -462,9 +480,13 @@ class FloatingSliderPlugin {
                         <option value="bottom" <?php selected($settings['position_vertical'], 'bottom'); ?>><?php esc_html_e('Bottom', 'floating-slider-pro'); ?></option>
                     </select><br>
                     <label for="floating_slider_offset_h"><?php esc_html_e('Horizontal Offset:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_offset_h" name="floating_slider_settings[horizontal_offset]" value="<?php echo esc_attr($settings['horizontal_offset']); ?>" class="numeric-slider-input" data-min="-500" data-max="500" data-step="1" /> px<br>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_offset_h" name="floating_slider_settings[horizontal_offset]" value="<?php echo esc_attr($settings['horizontal_offset']); ?>" class="numeric-slider-input" data-min="-500" data-max="500" data-step="1" /> px
+                    </div><br>
                     <label for="floating_slider_offset_v"><?php esc_html_e('Vertical Offset:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_offset_v" name="floating_slider_settings[vertical_offset]" value="<?php echo esc_attr($settings['vertical_offset']); ?>" class="numeric-slider-input" data-min="-500" data-max="500" data-step="1" /> px
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_offset_v" name="floating_slider_settings[vertical_offset]" value="<?php echo esc_attr($settings['vertical_offset']); ?>" class="numeric-slider-input" data-min="-500" data-max="500" data-step="1" /> px
+                    </div>
                 </td>
             </tr>
 
@@ -472,7 +494,9 @@ class FloatingSliderPlugin {
                 <th scope="row"><?php esc_html_e('Close Button', 'floating-slider-pro'); ?></th>
                 <td>
                     <label for="floating_slider_close_size"><?php esc_html_e('Size:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_close_size" name="floating_slider_settings[close_button_size]" value="<?php echo esc_attr($settings['close_button_size']); ?>" min="10" max="50" class="numeric-slider-input" data-min="10" data-max="50" data-step="1" /> px<br>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_close_size" name="floating_slider_settings[close_button_size]" value="<?php echo esc_attr($settings['close_button_size']); ?>" min="10" max="50" class="numeric-slider-input" data-min="10" data-max="50" data-step="1" /> px
+                    </div><br>
                     <label for="floating_slider_close_color"><?php esc_html_e('Text Color:', 'floating-slider-pro'); ?></label>
                     <input type="text" id="floating_slider_close_color" name="floating_slider_settings[close_button_color]" value="<?php echo esc_attr($settings['close_button_color']); ?>" class="color-picker" /><br>
                     <label for="floating_slider_close_bg"><?php esc_html_e('Background Color:', 'floating-slider-pro'); ?></label>
@@ -483,14 +507,18 @@ class FloatingSliderPlugin {
                         <option value="right" <?php selected($settings['close_button_pos_h'], 'right'); ?>><?php esc_html_e('Right', 'floating-slider-pro'); ?></option>
                     </select><br>
                     <label for="floating_slider_close_offset_h"><?php esc_html_e('Button Horizontal Offset:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_close_offset_h" name="floating_slider_settings[close_button_offset_h]" value="<?php echo esc_attr($settings['close_button_offset_h']); ?>" class="numeric-slider-input" data-min="-100" data-max="100" data-step="1" /> px<br>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_close_offset_h" name="floating_slider_settings[close_button_offset_h]" value="<?php echo esc_attr($settings['close_button_offset_h']); ?>" class="numeric-slider-input" data-min="-100" data-max="100" data-step="1" /> px
+                    </div><br>
                     <label for="floating_slider_close_pos_v"><?php esc_html_e('Button Vertical Position:', 'floating-slider-pro'); ?></label>
                     <select id="floating_slider_close_pos_v" name="floating_slider_settings[close_button_pos_v]">
                         <option value="top" <?php selected($settings['close_button_pos_v'], 'top'); ?>><?php esc_html_e('Top', 'floating-slider-pro'); ?></option>
                         <option value="bottom" <?php selected($settings['close_button_pos_v'], 'bottom'); ?>><?php esc_html_e('Bottom', 'floating-slider-pro'); ?></option>
                     </select><br>
                     <label for="floating_slider_close_offset_v"><?php esc_html_e('Button Vertical Offset:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_close_offset_v" name="floating_slider_settings[close_button_offset_v]" value="<?php echo esc_attr($settings['close_button_offset_v']); ?>" class="numeric-slider-input" data-min="-100" data-max="100" data-step="1" /> px
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_close_offset_v" name="floating_slider_settings[close_button_offset_v]" value="<?php echo esc_attr($settings['close_button_offset_v']); ?>" class="numeric-slider-input" data-min="-100" data-max="100" data-step="1" /> px
+                    </div>
                 </td>
             </tr>
 
@@ -504,9 +532,13 @@ class FloatingSliderPlugin {
                         <option value="zoom" <?php selected($settings['animation_type'], 'zoom'); ?>><?php esc_html_e('Zoom', 'floating-slider-pro'); ?></option>
                     </select><br>
                     <label for="floating_slider_slide_duration"><?php esc_html_e('Slide Duration:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_slide_duration" name="floating_slider_settings[slide_duration]" value="<?php echo esc_attr($settings['slide_duration']); ?>" min="500" class="numeric-slider-input" data-min="500" data-max="10000" data-step="100" /> ms<br>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_slide_duration" name="floating_slider_settings[slide_duration]" value="<?php echo esc_attr($settings['slide_duration']); ?>" min="500" class="numeric-slider-input" data-min="500" data-max="10000" data-step="100" /> ms
+                    </div><br>
                     <label for="floating_slider_delay_show"><?php esc_html_e('Delay Show:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_delay_show" name="floating_slider_settings[delay_show]" value="<?php echo esc_attr($settings['delay_show']); ?>" min="0" class="numeric-slider-input" data-min="0" data-max="10000" data-step="100" /> ms
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_delay_show" name="floating_slider_settings[delay_show]" value="<?php echo esc_attr($settings['delay_show']); ?>" min="0" class="numeric-slider-input" data-min="0" data-max="10000" data-step="100" /> ms
+                    </div>
                 </td>
             </tr>
         </table>
@@ -532,7 +564,9 @@ class FloatingSliderPlugin {
                         <option value="pulse" <?php selected($settings['border_theme'], 'pulse'); ?>><?php esc_html_e('Pulse', 'floating-slider-pro'); ?></option>
                     </select><br>
                     <label for="floating_slider_border_radius"><?php esc_html_e('Border Radius:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_border_radius" name="floating_slider_settings[border_radius]" value="<?php echo esc_attr($settings['border_radius']); ?>" min="0" max="100" class="numeric-slider-input" data-min="0" data-max="100" data-step="1" /> px
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_border_radius" name="floating_slider_settings[border_radius]" value="<?php echo esc_attr($settings['border_radius']); ?>" min="0" max="100" class="numeric-slider-input" data-min="0" data-max="100" data-step="1" /> px
+                    </div>
                     <p class="description"><?php esc_html_e('This value also applies to image corners for harmony.', 'floating-slider-pro'); ?></p>
                 </td>
             </tr>
@@ -540,7 +574,9 @@ class FloatingSliderPlugin {
                 <th scope="row"><?php esc_html_e('Shadow Settings', 'floating-slider-pro'); ?></th>
                 <td>
                     <label for="floating_slider_shadow_blur"><?php esc_html_e('Shadow Blur:', 'floating-slider-pro'); ?></label>
-                    <input type="number" id="floating_slider_shadow_blur" name="floating_slider_settings[shadow_blur]" value="<?php echo esc_attr($settings['shadow_blur']); ?>" min="0" max="100" class="numeric-slider-input" data-min="0" data-max="100" data-step="1" /> px<br>
+                    <div class="numeric-slider-wrapper">
+                        <input type="number" id="floating_slider_shadow_blur" name="floating_slider_settings[shadow_blur]" value="<?php echo esc_attr($settings['shadow_blur']); ?>" min="0" max="100" class="numeric-slider-input" data-min="0" data-max="100" data-step="1" /> px
+                    </div><br>
                     <label for="floating_slider_shadow_color"><?php esc_html_e('Shadow Color:', 'floating-slider-pro'); ?></label>
                     <input type="text" id="floating_slider_shadow_color" name="floating_slider_settings[shadow_color]" value="<?php echo esc_attr($settings['shadow_color']); ?>" class="color-picker" data-alpha="true" />
                     <p class="description"><?php esc_html_e('Use hex, RGB, or RGBA for transparency.', 'floating-slider-pro'); ?></p>
@@ -682,7 +718,7 @@ class FloatingSliderPlugin {
             box-shadow: 0px 0px <?php echo esc_attr($settings['shadow_blur']); ?>px <?php echo esc_attr($settings['shadow_color']); ?>;
             overflow: hidden;
             display: none; /* Hidden by default, shown by JS */
-            box-sizing: content-box; /* To ensure border doesn't shrink content */
+            box-sizing: content-box;
         }
 
         #floating-slider-pro-container .fs-slider-image {
@@ -691,8 +727,8 @@ class FloatingSliderPlugin {
             object-fit: <?php echo esc_attr($settings['image_fit']); ?>;
             cursor: pointer;
             transition: transform 0.3s ease;
-            display: block; /* Ensure images are block level */
-            border-radius: <?php echo esc_attr($settings['border_radius']); ?>px; /* Match slider border radius */
+            display: block;
+            border-radius: <?php echo esc_attr($settings['border_radius']); ?>px;
         }
 
         #floating-slider-pro-container .fs-slider-image:hover {
@@ -709,17 +745,14 @@ class FloatingSliderPlugin {
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            /* Center the 'x' character */
-            font-size: <?php echo esc_attr($settings['close_button_size'] * 0.7); ?>px; /* Adjust font size relative to button size */
-            line-height: <?php echo esc_attr($settings['close_button_size']); ?>px; /* Vertically align text */
-            text-align: center; /* Horizontally align text */
-            display: flex; /* Use flexbox for perfect centering */
-            align-items: center; /* Vertical centering with flex */
-            justify-content: center; /* Horizontal centering with flex */
+            font-size: <?php echo esc_attr($settings['close_button_size'] * 0.7); ?>px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             z-index: 1000000;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             transition: all 0.3s ease;
-            box-sizing: border-box; /* Include padding/border in element's total width and height */
+            box-sizing: border-box;
         }
 
         #fs-slider-close:hover {
@@ -739,32 +772,31 @@ class FloatingSliderPlugin {
         }
 
         /* Animation classes for JS */
-        .fs-slider-image.fade-transition {
-            opacity: 0;
-            position: absolute; /* Needed for overlap in fade */
+        /* Fade animation is handled by jQuery fadeOut/fadeIn */
+        .fs-slider-image.active {
+            display: block;
         }
-        .fs-slider-image.fade-transition.active {
-            opacity: 1;
-            transition: opacity 0.5s ease-in-out;
-        }
-
-        .fs-slider-image.slide-transition {
-            position: absolute;
-            top: 0;
-            /* Start position for slide: depends on direction, handled in JS */
-            transition: transform 0.5s ease-in-out;
-        }
-        .fs-slider-image.slide-transition.active {
-            transform: translateX(0) scale(1);
+        .fs-slider-image.inactive {
+            display: none;
         }
 
-        .fs-slider-image.zoom-transition {
-            transform: scale(0);
-            position: absolute; /* Needed for overlap */
-            transition: transform 0.5s ease-in-out;
-        }
-        .fs-slider-image.zoom-transition.active {
-            transform: scale(1);
+        /* Responsive styles for mobile */
+        @media (max-width: 767px) {
+            #floating-slider-pro-container {
+                width: <?php echo esc_attr($settings['mobile_width']); ?>px;
+                height: <?php echo esc_attr($settings['mobile_height']); ?>px;
+                /* Adjust position for mobile if needed, e.g., always center */
+                left: 50% !important; /* Override desktop left/right */
+                right: auto !important; /* Override desktop left/right */
+                transform: translateX(-50%) translateY(-50%) translateY(<?php echo esc_attr($settings['vertical_offset']); ?>px) !important;
+                top: 50% !important; /* Override top/bottom */
+            }
+            #fs-slider-close {
+                /* Adjust close button position for mobile if it's too close to edges */
+                right: 0px !important; /* Example: stick to top right on mobile */
+                top: 0px !important;
+                transform: translate(50%, -50%) !important; /* Move outside the container */
+            }
         }
         </style>
         <?php
@@ -783,9 +815,8 @@ class FloatingSliderPlugin {
                 <?php foreach ($settings['images'] as $index => $image): ?>
                     <img src="<?php echo esc_url($image['url']); ?>"
                          alt="<?php esc_attr_e('Slider Image', 'floating-slider-pro'); ?>"
-                         onclick="window.open('<?php echo esc_url($image['link']); ?>', '_blank')"
-                         class="fs-slider-image <?php echo esc_attr($settings['animation_type']); ?>-transition <?php echo $index === 0 ? 'active' : ''; ?>"
-                         style="<?php echo $index === 0 ? '' : 'display: none;'; ?>" />
+                         data-link="<?php echo esc_url($image['link']); ?>"
+                         class="fs-slider-image <?php echo $index === 0 ? 'active' : 'inactive'; ?>" />
                 <?php endforeach; ?>
             </div>
         </div>
@@ -802,7 +833,6 @@ class FloatingSliderPlugin {
             return;
         }
 
-        // Check page display conditions
         if ($settings['display_pages'] == 'specific') {
             $current_page_id = get_queried_object_id();
             if (!in_array($current_page_id, $settings['specific_pages'])) {
