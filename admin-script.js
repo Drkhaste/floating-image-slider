@@ -1,7 +1,6 @@
 jQuery(document).ready(function($) {
     // Initialize WordPress Color Picker
     $('.color-picker').wpColorPicker({
-        // Add alpha channel support if 'data-alpha="true"' is set
         palettes: true,
         change: function(event, ui) {
             if ($(this).data('alpha')) {
@@ -20,23 +19,63 @@ jQuery(document).ready(function($) {
         }
     });
 
+    // Custom Numeric Slider Functionality
+    // This creates a visual slider next to each numeric input with class 'numeric-slider-input'
+    $('.numeric-slider-input').each(function() {
+        var $input = $(this);
+        var min = parseFloat($input.data('min') || $input.attr('min') || 0);
+        var max = parseFloat($input.data('max') || $input.attr('max') || 100);
+        var step = parseFloat($input.data('step') || $input.attr('step') || 1);
+        var initialValue = parseFloat($input.val());
+
+        // Clamp initial value to min/max
+        if (initialValue < min) initialValue = min;
+        if (initialValue > max) initialValue = max;
+        $input.val(initialValue);
+
+        var $slider = $('<input type="range" class="slider">')
+            .attr('min', min)
+            .attr('max', max)
+            .attr('step', step)
+            .val(initialValue);
+
+        $input.wrap('<div class="numeric-slider-wrapper"></div>').after($slider);
+
+        $slider.on('input', function() {
+            $input.val($(this).val());
+        });
+
+        $input.on('input', function() {
+            var val = parseFloat($(this).val());
+            if (isNaN(val)) val = min; // Default if input is empty or invalid
+            if (val < min) val = min;
+            if (val > max) val = max;
+            $(this).val(val); // Update input field (clamped)
+            $slider.val(val); // Update slider
+        });
+    });
+
+
     // Handle Add Image button click
     $('#fs-add-image-btn').on('click', function(event) {
         event.preventDefault();
 
         var frame = wp.media({
-            title: floatingSliderAjax.messages.enter_image_link,
+            title: 'Select or Upload Image',
             button: {
-                text: 'Select Image'
+                text: 'Use this image'
             },
             multiple: false // Allow selection of only one image
         });
 
         frame.on('select', function() {
             var attachment = frame.state().get('selection').first().toJSON();
-            var linkUrl = prompt(floatingSliderAjax.messages.enter_image_link, 'https://'); // Prompt for link
+            var linkUrl = prompt(floatingSliderAjax.messages.enter_image_link, attachment.url); // Pre-fill with image URL
 
             if (linkUrl !== null) { // If user didn't cancel prompt
+                // Show message if no images were present
+                $('#no-images-message').remove();
+
                 $.ajax({
                     url: floatingSliderAjax.ajaxurl,
                     type: 'POST',
@@ -48,11 +87,26 @@ jQuery(document).ready(function($) {
                     },
                     success: function(response) {
                         if (response.success) {
-                            // Reload the page to show the new image and re-initialize sortable
-                            location.reload();
-                            // Or, for a smoother UX, dynamically add the image without reload:
-                            // We could build the image item HTML and append it to #fs-slider-images-list
-                            // But for simplicity with current architecture and sortable, reload is easier.
+                            var imageData = response.data.image;
+                            var currentImageCount = $('#fs-slider-images-list .fs-image-item').length;
+                            var imageItemHtml = `
+                                <li class="fs-image-item" data-attachment-id="${imageData.id}" data-index="${currentImageCount}">
+                                    <div class="fs-image-preview" style="width: ${$('#floating_slider_width').val()}px; height: ${$('#floating_slider_height').val()}px;">
+                                        <img src="${imageData.url}" alt="Slider Image" style="object-fit: ${$('#floating_slider_image_fit').val()}; border-radius: ${$('#floating_slider_border_radius').val()}px;" />
+                                    </div>
+                                    <div class="fs-image-details">
+                                        <strong>Link:</strong>
+                                        <span class="fs-image-link-display">${imageData.link}</span>
+                                        <input type="url" class="fs-image-link-input" value="${imageData.link}" style="display: none;" />
+                                        <button type="button" class="fs-edit-link-btn button button-small">Edit Link</button>
+                                        <button type="button" class="fs-save-link-btn button button-small button-primary" style="display: none;">Save Link</button>
+                                        <p class="fs-image-info">Original Dimensions: ${imageData.original_dimensions}</p>
+                                        <button type="button" class="fs-delete-image-btn button button-small button-danger">Delete</button>
+                                    </div>
+                                </li>
+                            `;
+                            $('#fs-slider-images-list').append(imageItemHtml);
+                            console.log(response.data.message);
                         } else {
                             alert(response.data.message);
                         }
@@ -87,7 +141,7 @@ jQuery(document).ready(function($) {
                 },
                 success: function(response) {
                     if (response.success) {
-                        // Re-index data-index attributes after sorting if necessary
+                        // Re-index data-index attributes after sorting
                         $('#fs-slider-images-list').children('.fs-image-item').each(function(index) {
                             $(this).data('index', index);
                         });
@@ -121,7 +175,7 @@ jQuery(document).ready(function($) {
                     if (response.success) {
                         $item.fadeOut(300, function() {
                             $(this).remove();
-                            // Re-index remaining items
+                            // Re-index remaining items after removal
                             $('#fs-slider-images-list').children('.fs-image-item').each(function(idx) {
                                 $(this).data('index', idx);
                             });
@@ -181,32 +235,27 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // Tab functionality
+    // Tab functionality - Modified to just switch visibility without full page reload
     $('.nav-tab-wrapper a').on('click', function(e) {
         e.preventDefault();
-        var tab = $(this).attr('href').split('tab=')[1];
-        if (!tab) tab = 'general'; // Default tab
+        var tab_id = $(this).attr('href').split('tab=')[1];
+        if (!tab_id) tab_id = 'general'; // Default tab
 
         // Update URL without reloading page
-        history.pushState(null, null, '?page=floating-slider&tab=' + tab);
+        history.pushState(null, null, '?page=floating-slider&tab=' + tab_id);
 
         // Show/hide content based on tab
         $('.tab-content').hide(); // Hide all tab content
-        $('#' + tab + '-tab-content').show(); // Show current tab content
+        $('#' + tab_id + '-tab-content').show(); // Show current tab content
 
         // Update active class for tabs
         $('.nav-tab-wrapper a').removeClass('nav-tab-active');
         $(this).addClass('nav-tab-active');
-
-        // Reload the page to ensure proper form submission and data display after tab switch
-        // This is a simple way to handle form submission for different sections.
-        // For a more advanced SPA-like experience, you would use AJAX to save settings per tab.
-        window.location.href = $(this).attr('href');
     });
 
-    // Ensure the correct tab is active on page load
+    // Ensure the correct tab is active on page load and show content
     var currentTab = new URLSearchParams(window.location.search).get('tab');
     if (!currentTab) currentTab = 'general';
     $('.nav-tab-wrapper a[href$="tab=' + currentTab + '"]').addClass('nav-tab-active');
-
+    $('#' + currentTab + '-tab-content').show();
 });

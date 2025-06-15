@@ -34,6 +34,63 @@
     margin-bottom: 0;
 }
 
+/* Numeric Slider Wrapper */
+.numeric-slider-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px; /* Space between input and slider */
+    margin-bottom: 5px;
+}
+
+.numeric-slider-wrapper input[type="number"] {
+    width: 80px; /* Make number input smaller */
+    margin-bottom: 0; /* Remove bottom margin */
+}
+
+.numeric-slider-wrapper .slider {
+    flex-grow: 1; /* Allow slider to take available space */
+    width: 150px; /* Default width for the slider track */
+    height: 8px; /* Height of the slider track */
+    background: #d3d3d3;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity .2s;
+    -webkit-appearance: none; /* Remove default styling */
+    appearance: none;
+    border-radius: 5px;
+}
+
+.numeric-slider-wrapper .slider:hover {
+    opacity: 1;
+}
+
+.numeric-slider-wrapper .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0073aa;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+.numeric-slider-wrapper .slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0073aa;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+
+/* Tab Content Styling */
+.tab-content-wrapper {
+    margin-top: 20px;
+    padding: 10px 0;
+}
+
 /* Image Management Section */
 #fs-slider-images-list {
     list-style: none;
