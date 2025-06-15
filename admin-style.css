@@ -1,0 +1,127 @@
+/* Floating Professional Slider Admin Styles */
+
+.wrap h1 {
+    margin-bottom: 20px;
+}
+
+.nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.form-table th {
+    width: 200px; /* Adjust as needed for alignment */
+    padding-top: 15px;
+    padding-bottom: 15px;
+}
+
+.form-table td {
+    padding-top: 15px;
+    padding-bottom: 15px;
+}
+
+.form-table input[type="number"],
+.form-table input[type="text"],
+.form-table select {
+    min-width: 150px;
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
+
+.form-table .description {
+    font-style: italic;
+    color: #666;
+    margin-top: 5px;
+    margin-bottom: 0;
+}
+
+/* Image Management Section */
+#fs-slider-images-list {
+    list-style: none;
+    margin: 20px 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.fs-image-item {
+    border: 1px solid #c3c4c7;
+    padding: 15px;
+    background-color: #fff;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 250px; /* Fixed width for better layout */
+    text-align: center;
+    cursor: grab; /* Indicate draggable */
+    position: relative; /* For preview position */
+}
+
+.fs-image-item:active {
+    cursor: grabbing;
+}
+
+.fs-image-preview {
+    border: 1px dashed #ddd;
+    margin-bottom: 10px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f9f9f9;
+}
+
+.fs-image-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+}
+
+.fs-image-details {
+    width: 100%;
+}
+
+.fs-image-details strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.fs-image-link-display {
+    display: block;
+    margin-bottom: 5px;
+    word-break: break-all;
+    font-size: 0.9em;
+    color: #0073aa;
+}
+
+.fs-image-link-input {
+    width: calc(100% - 10px);
+    margin-bottom: 5px;
+}
+
+.fs-image-info {
+    font-size: 0.8em;
+    color: #888;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+
+.fs-image-details .button {
+    margin: 5px 2px;
+}
+
+.button-danger {
+    background: #dc3232;
+    border-color: #dc3232;
+    color: #fff;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+.button-danger:hover,
+.button-danger:focus {
+    background: #e46060;
+    border-color: #e46060;
+    color: #fff;
+}
