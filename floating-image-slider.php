@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Floating Image Slider
  * Description: A customizable floating image slider widget that can be displayed on any page with full admin control
- * Version: 2.0.8
- * Author: Your Name
+ * Version: 2.0.13
+ * Author: BTC
  */
 
 // Prevent direct access
@@ -54,16 +54,16 @@ class FloatingImageSlider {
             'offset_y' => 25,
             'mobile_offset_x' => 10,
             'mobile_offset_y' => 10,
-            'images' => array(), // 'alt' field removed here
+            'images' => array(),
             'close_button_enabled' => true,
             'close_button_size' => 28,
             'close_button_position' => 'top-right',
             'close_button_color' => '#ffffff',
             'close_button_bg' => '#e74c3c',
             'slide_animation' => 'fade',
-            'slide_duration' => 4500,
-            'animation_speed' => 700,
-            'delay_after_load' => 2000,
+            'slide_duration' => 4500, // milliseconds
+            'animation_speed' => 700, // milliseconds
+            'delay_before_first_slide' => 2000, // milliseconds for initial fade-in after page load
             'border_theme' => 'shadow',
             'border_radius' => 15,
             'border_color' => '#2980b9',
@@ -82,6 +82,7 @@ class FloatingImageSlider {
             'overlay_text_alignment' => 'center',
             'overlay_padding' => 10,
             'overlay_border_radius' => 8,
+            'image_fit' => 'cover',
         );
     }
 
@@ -96,19 +97,14 @@ class FloatingImageSlider {
     }
 
     public function enqueue_scripts() {
-        // Enqueue jQuery explicitly to ensure it's loaded for all scripts below.
         if ( ! wp_script_is( 'jquery', 'enqueued' ) ) {
             wp_enqueue_script( 'jquery' );
         }
         
-        // Only enqueue inline styles/scripts if the slider should potentially be displayed
-        // on the frontend. This prevents unnecessary code on pages where the slider is off.
-        // For admin pages, scripts are enqueued directly in admin_page().
         if (!$this->should_display_slider() && !is_admin()) {
             return;
         }
 
-        // For frontend, add inline styles and scripts
         if (!is_admin()) {
             add_action('wp_head', array($this, 'inline_styles_scripts'));
         }
@@ -130,6 +126,7 @@ class FloatingImageSlider {
             border-radius: <?php echo esc_attr($options['border_radius']); ?>px;
             box-sizing: border-box;
             background-color: #f0f0f0; /* Fallback for transparency */
+            transition: all 0.5s ease;
         }
 
         #floating-slider .slide-item {
@@ -140,56 +137,82 @@ class FloatingImageSlider {
             left: 0;
             overflow: hidden;
             opacity: 0;
-            /* Transition for fade. For slide, this will be dynamically adjusted */
+            z-index: 1; /* Default z-index for all slides */
             transition: opacity <?php echo esc_attr($options['animation_speed']); ?>ms ease-in-out;
-            display: flex; /* For overlay text positioning */
-            /* Default alignment for bottom text */
-            align-items: flex-end;
-            justify-content: center;
         }
 
         #floating-slider .slide-item.active {
             opacity: 1;
-            /* Initial state for active slide for slide animation */
+            z-index: 2; /* Active slide is above others */
+            /* Initial state for active slide for slide animation (no transform applied on load for smooth fade-in) */
             <?php if ($options['slide_animation'] === 'slide'): ?>
             transform: translateX(0);
             <?php endif; ?>
         }
 
+        #floating-slider .slide-item a {
+            display: block;
+            width: 100%;
+            height: 100%;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            pointer-events: auto; /* Ensure the link is clickable */
+        }
+
         #floating-slider img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            cursor: pointer;
+            object-fit: <?php echo esc_attr($options['image_fit']); ?>;
             display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
         #floating-slider .overlay-text {
-            position: relative;
-            width: fit-content; 
-            max-width: 90%;
+            position: absolute;
+            width: 100%;
             box-sizing: border-box;
-            <?php if ($options['overlay_bg_enabled']): ?>
-            background-color: <?php echo esc_attr($options['overlay_bg_color']); ?>;
+            z-index: 10;
+            display: flex;
+            padding: <?php echo esc_attr($options['overlay_padding']); ?>px;
+            border-radius: <?php echo esc_attr($options['overlay_border_radius']); ?>px;
+            pointer-events: none; /* Crucial: Clicks pass through to the <a> tag below */
+            
+            <?php 
+            if ($options['overlay_text_position'] === 'top'): ?>
+            top: 0; left: 0; align-items: flex-start;
+            <?php elseif ($options['overlay_text_position'] === 'center'): ?>
+            top: 0; left: 0; align-items: center; justify-content: center; height: 100%;
+            <?php else: /* bottom */ ?>
+            bottom: 0; left: 0; align-items: flex-end;
             <?php endif; ?>
+        }
+
+        #floating-slider .overlay-text span {
+            background-color: <?php echo ($options['overlay_bg_enabled']) ? esc_attr($options['overlay_bg_color']) : 'transparent'; ?>;
             color: <?php echo esc_attr($options['overlay_text_color']); ?>;
             font-size: <?php echo esc_attr($options['overlay_font_size']); ?>px;
             text-align: <?php echo esc_attr($options['overlay_text_alignment']); ?>;
             padding: <?php echo esc_attr($options['overlay_padding']); ?>px;
             border-radius: <?php echo esc_attr($options['overlay_border_radius']); ?>px;
-            margin: <?php echo ($options['overlay_text_position'] !== 'center' ? '0 auto 0 auto' : 'auto'); ?>;
-            z-index: 10;
-            pointer-events: none;
+            max-width: 90%;
+            box-sizing: border-box;
+            line-height: 1.4;
+            display: inline-block;
+            <?php if ($options['overlay_text_alignment'] === 'left'): ?>
+            margin-right: auto;
+            <?php elseif ($options['overlay_text_alignment'] === 'right'): ?>
+            margin-left: auto;
+            <?php else: /* center */ ?>
+            margin-left: auto; margin-right: auto;
+            <?php endif; ?>
+            word-wrap: break-word;
         }
-
-        <?php 
-        if ($options['overlay_text_position'] === 'top'): ?>
-        #floating-slider .slide-item { align-items: flex-start; }
-        <?php elseif ($options['overlay_text_position'] === 'center'): ?>
-        #floating-slider .slide-item { align-items: center; }
-        <?php else: ?>
-        #floating-slider .slide-item { align-items: flex-end; }
-        <?php endif; ?>
 
         #floating-slider .close-btn {
             position: absolute;
@@ -225,28 +248,22 @@ class FloatingImageSlider {
             transition: opacity <?php echo esc_attr($options['animation_speed']); ?>ms ease-in-out, transform <?php echo esc_attr($options['animation_speed']); ?>ms ease-in-out;
         }
 
-        /* Specific classes for slide transitions */
+        /* Specific classes for slide transitions (applied by JS) */
         #floating-slider .slide-item.slide-out-left {
-            transform: translateX(-100%);
-            opacity: 0;
+            transform: translateX(-100%) !important; /* Use !important to override .active if needed during transition */
+            opacity: 0 !important;
+            z-index: 1 !important;
         }
         #floating-slider .slide-item.slide-out-right {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        /* These are applied to the NEXT slide when it's prepared to slide IN */
-        #floating-slider .slide-item.slide-in-right-initial { /* From right for left slide-out */
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        #floating-slider .slide-item.slide-in-left-initial { /* From left for right slide-out */
-            transform: translateX(-100%);
-            opacity: 0;
+            transform: translateX(100%) !important;
+            opacity: 0 !important;
+            z-index: 1 !important;
         }
         /* Applied once the slide should animate in */
         #floating-slider .slide-item.slide-in-active {
-            transform: translateX(0);
-            opacity: 1;
+            transform: translateX(0) !important;
+            opacity: 1 !important;
+            z-index: 2 !important; /* Ensure it's on top when sliding in */
         }
         <?php endif; ?>
 
@@ -256,7 +273,7 @@ class FloatingImageSlider {
                 height: <?php echo esc_attr($options['mobile_height']); ?>px !important;
                 <?php echo $this->get_position_css($options, 'mobile'); ?>
             }
-            #floating-slider .overlay-text {
+            #floating-slider .overlay-text span {
                 font-size: <?php echo esc_attr($options['mobile_overlay_font_size']); ?>px;
             }
         }
@@ -272,8 +289,8 @@ class FloatingImageSlider {
                 animationSpeed: <?php echo esc_attr($options['animation_speed']); ?>,
                 slideDuration: <?php echo esc_attr($options['slide_duration']); ?>,
                 slideAnimation: '<?php echo esc_attr($options['slide_animation']); ?>',
-                delayAfterLoad: <?php echo esc_attr($options['delay_after_load']); ?>,
-
+                delayBeforeFirstSlide: <?php echo esc_attr($options['delay_before_first_slide']); ?>,
+                
                 init: function() {
                     this.container = $('#floating-slider');
                     this.slideItems = this.container.find('.slide-item');
@@ -286,39 +303,34 @@ class FloatingImageSlider {
                     
                     // If only one slide, just show it and exit. No need for slideshow.
                     if (this.slideItems.length === 1) {
-                         this.slideItems.eq(0).addClass('active').css({opacity: 1, transform: 'translateX(0)'});
+                         this.slideItems.eq(0)
+                             .css({opacity: 1, transform: 'translateX(0)', 'z-index': 2}) // Set z-index for single slide
+                             .addClass('active');
                          setTimeout(function() {
                              slider.show();
-                         }, this.delayAfterLoad);
+                         }, this.delayBeforeFirstSlide);
                          return;
                     }
 
                     // Pre-set the first slide as active and visible without transition to avoid flicker
-                    this.slideItems.eq(0).addClass('active').css({opacity: 1, transform: 'translateX(0)'});
+                    // and ensure it's on top initially.
+                    this.slideItems.eq(0).addClass('active').css({opacity: 1, 'z-index': 2}); // Set z-index for active
 
                     // Set transitions for all items after initial load, so they animate from now on
                     var self = this;
                     this.slideItems.each(function() {
-                        $(this).css('transition', 'opacity ' + self.animationSpeed + 'ms ease-in-out, transform ' + self.animationSpeed + 'ms ease-in-out');
+                        $(this).css('transition', 'opacity ' + self.animationSpeed + 'ms ease-in-out, transform ' + self.animationSpeed + 'ms ease-in-out, z-index 0s'); // Add z-index to transition for immediate change
                     });
 
                     // Show the slider after a delay and start slideshow
                     setTimeout(function() {
                         slider.show();
                         slider.startSlideshow();
-                    }, this.delayAfterLoad);
+                    }, this.delayBeforeFirstSlide);
 
                     // Attach close button event
                     this.container.find('.close-btn').on('click', function() {
                         slider.hide();
-                    });
-
-                    // Attach image click event
-                    this.container.on('click', '.slide-item img', function() {
-                        var link = $(this).closest('.slide-item').data('link');
-                        if (link) {
-                            window.open(link, '_blank');
-                        }
                     });
                 },
 
@@ -332,51 +344,53 @@ class FloatingImageSlider {
                 },
 
                 showSlide: function(index) {
-                    // Prevent showing if only one slide or no slides
-                    if (this.slideItems.length <= 1) {
+                    if (this.slideItems.length <= 1 || index === this.currentIndex) {
                         return;
                     }
 
                     var currentSlide = this.slideItems.eq(this.currentIndex);
                     var nextSlide = this.slideItems.eq(index);
 
-                    if (nextSlide.is(currentSlide)) {
-                        return; // Already showing this slide
-                    }
-
-                    // For fade animation
+                    // Fade Animation
                     if (this.slideAnimation === 'fade') {
-                        currentSlide.removeClass('active').css('opacity', 0); // Fade out
-                        nextSlide.addClass('active').css('opacity', 1);       // Fade in
+                        currentSlide.removeClass('active').css({'z-index': 1, 'opacity': 0}); // Fade out current, set lower z-index
+                        nextSlide.addClass('active').css({'z-index': 2, 'opacity': 1});       // Fade in next, set higher z-index
                     }
-                    // For slide animation
+                    // Slide Animation
                     else if (this.slideAnimation === 'slide') {
                         var isForward = (index > this.currentIndex || (index === 0 && this.currentIndex === this.slideItems.length - 1));
                         
+                        // Set current slide to a lower z-index for smooth transition out
+                        currentSlide.css('z-index', 1);
+
                         // Prepare the next slide for entry
-                        // Position it off-screen (right if moving forward, left if moving backward)
                         nextSlide.removeClass('active slide-in-left-initial slide-in-right-initial slide-in-active'); // Clean slate
                         nextSlide.css({
                             opacity: 0,
-                            transform: isForward ? 'translateX(100%)' : 'translateX(-100%)'
+                            transform: isForward ? 'translateX(100%)' : 'translateX(-100%)',
+                            'z-index': 2 // New slide comes on top
                         });
 
-                        // Ensure CSS is applied before transition
+                        // Force reflow to ensure initial state is applied before transition
                         nextSlide[0].offsetWidth; 
 
                         // Animate current slide out
                         currentSlide.removeClass('active').addClass(isForward ? 'slide-out-left' : 'slide-out-right');
 
                         // Animate next slide in
-                        nextSlide.addClass('active slide-in-active'); // Add active for display, slide-in-active for transition
-                        nextSlide.css({
-                            opacity: 1,
-                            transform: 'translateX(0%)'
-                        });
+                        // Use a short delay for smooth overlapping slide effect
+                        setTimeout(function() {
+                            nextSlide.addClass('active slide-in-active');
+                            // Ensure the transform and opacity are set for animation
+                            nextSlide.css({
+                                opacity: 1,
+                                transform: 'translateX(0%)'
+                            });
+                        }, 50); // Small delay to ensure slide-out starts before slide-in
 
                         // Clean up current slide after its transition is complete
                         setTimeout(function() {
-                            currentSlide.removeClass('slide-out-left slide-out-right').css({transform: '', opacity: 0});
+                            currentSlide.removeClass('slide-out-left slide-out-right').css({transform: '', opacity: 0, 'z-index': 1});
                         }, this.animationSpeed);
                     }
 
@@ -485,35 +499,37 @@ class FloatingImageSlider {
         $css .= "border-radius: {$borderRadius}px; ";
 
         switch ($options['border_theme']) {
+            case 'simple':
+                $css .= "border: {$borderWidth}px solid {$borderColor}; ";
+                $css .= "box-shadow: 0 4px 10px rgba(0,0,0,0.1); "; // Slightly nicer shadow
+                break;
+
             case 'shadow':
                 $css .= "border: {$borderWidth}px solid {$borderColor}; ";
-                $css .= "box-shadow: 0 0 {$shadowBlur}px {$shadowColor}; ";
+                $css .= "box-shadow: 0 0 {$shadowBlur}px {$shadowColor}; "; // Enhanced shadow
                 break;
 
             case 'gradient':
+                // Using border-image for better gradient border appearance
                 $css .= "border: {$borderWidth}px solid transparent; ";
-                $css .= "background-image: linear-gradient({$gradientStart}, {$gradientEnd}); ";
-                $css .= "background-origin: border-box; ";
-                $css .= "background-clip: padding-box, border-box; ";
-                $css .= "background-repeat: no-repeat; ";
-                $css .= "box-shadow: 0 2px 10px rgba(0,0,0,0.2);";
+                $css .= "border-image: linear-gradient(to right, {$gradientStart}, {$gradientEnd}) 1; "; // '1' slices the image and uses it as border
+                $css .= "box-shadow: 0 4px 15px rgba(0,0,0,0.25); "; // Add a subtle shadow
                 break;
 
             case 'fancy-border':
-                $css .= "border: {$borderWidth}px dashed {$borderColor}; ";
-                $css .= "box-shadow: 0 0 " . ($shadowBlur / 2) . "px {$shadowColor}; ";
-                $css .= "background-color: #fff;";
+                $css .= "border: {$borderWidth}px solid {$borderColor}; ";
+                $css .= "border-style: double; "; // Double border
+                $css .= "box-shadow: 0 0 " . ($shadowBlur / 2) . "px {$shadowColor}, inset 0 0 8px rgba(0,0,0,0.1); "; // Inner and outer shadow
+                $css .= "background-color: #fff; ";
                 break;
 
             case 'animated':
                 $css .= "border: {$borderWidth}px solid {$borderColor}; ";
-                $css .= "animation: floatingBorderPulse 2s infinite alternate; ";
-                $css .= "box-shadow: 0 0 {$shadowBlur}px {$shadowColor}; ";
+                $css .= "animation: floatingBorderPulse 2s infinite alternate, floatingShadowPulse 3s infinite ease-in-out; ";
+                // Initial shadow for when animation hasn't started
+                $css .= "box-shadow: 0 0 {$shadowBlur}px {$shadowColor}; "; 
+                $css .= "transition: border-color 0.5s ease, box-shadow 0.5s ease; "; // Smooth transitions for non-animated properties
                 break;
-
-            default: // simple
-                $css .= "border: {$borderWidth}px solid {$borderColor}; ";
-                $css .= "box-shadow: 0 2px 8px rgba(0,0,0,0.1);";
         }
 
         return $css;
@@ -543,12 +559,15 @@ class FloatingImageSlider {
                 $image_link = isset($image['link']) ? esc_url($image['link']) : '';
                 $overlay_text = isset($image['overlay_text']) ? wp_kses_post($image['overlay_text']) : '';
             ?>
-                <div class="slide-item <?php echo ($index === 0) ? 'active' : ''; ?>"
-                     data-link="<?php echo $image_link; ?>">
-                    <img src="<?php echo $image_url; ?>"
-                         alt=""> <?php if ($options['overlay_text_enabled'] && !empty($overlay_text)): ?>
-                        <div class="overlay-text"><?php echo $overlay_text; ?></div>
-                    <?php endif; ?>
+                <div class="slide-item <?php echo ($index === 0) ? 'active' : ''; ?>">
+                    <a href="<?php echo !empty($image_link) ? $image_link : '#'; ?>" 
+                       <?php echo !empty($image_link) ? 'target="_blank" rel="noopener noreferrer"' : ''; ?> 
+                       style="cursor: <?php echo !empty($image_link) ? 'pointer' : 'default'; ?>;">
+                        <img src="<?php echo $image_url; ?>" alt="">
+                        <?php if ($options['overlay_text_enabled'] && !empty($overlay_text)): ?>
+                            <div class="overlay-text"><span><?php echo $overlay_text; ?></span></div>
+                        <?php endif; ?>
+                    </a>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -556,9 +575,14 @@ class FloatingImageSlider {
         <?php if ($options['border_theme'] === 'animated'): ?>
         <style>
         @keyframes floatingBorderPulse {
-            0% { border-color: <?php echo esc_attr($options['border_color']); ?>; box-shadow: 0 0 5px <?php echo esc_attr($options['shadow_color']); ?>; }
-            50% { border-color: <?php echo esc_attr($options['gradient_start']); ?>; box-shadow: 0 0 20px <?php echo esc_attr($options['gradient_end']); ?>; }
-            100% { border-color: <?php echo esc_attr($options['border_color']); ?>; box-shadow: 0 0 5px <?php echo esc_attr($options['shadow_color']); ?>; }
+            0% { border-color: <?php echo esc_attr($options['border_color']); ?>; }
+            50% { border-color: <?php echo esc_attr($options['gradient_start']); ?>; }
+            100% { border-color: <?php echo esc_attr($options['border_color']); ?>; }
+        }
+        @keyframes floatingShadowPulse {
+            0% { box-shadow: 0 0 5px <?php echo esc_attr($options['shadow_color']); ?>; }
+            50% { box-shadow: 0 0 25px <?php echo esc_attr($options['gradient_end']); ?>; }
+            100% { box-shadow: 0 0 5px <?php echo esc_attr($options['shadow_color']); ?>; }
         }
         </style>
         <?php endif;
@@ -646,14 +670,18 @@ class FloatingImageSlider {
                             <td>
                                 <label>Width:
                                     <input type="range" name="width" min="100" max="800" value="<?php echo esc_attr($options['width']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['width']); ?></output> px
+                                    <input type="number" name="width_text" min="100" max="800" value="<?php echo esc_attr($options['width']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Height:
                                     <input type="range" name="height" min="100" max="600" value="<?php echo esc_attr($options['height']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['height']); ?></output> px
+                                    <input type="number" name="height_text" min="100" max="600" value="<?php echo esc_attr($options['height']); ?>"
+                                           class="number-input">
                                 </label>
                             </td>
                         </tr>
@@ -663,14 +691,18 @@ class FloatingImageSlider {
                             <td>
                                 <label>Width:
                                     <input type="range" name="mobile_width" min="100" max="400" value="<?php echo esc_attr($options['mobile_width']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['mobile_width']); ?></output> px
+                                    <input type="number" name="mobile_width_text" min="100" max="400" value="<?php echo esc_attr($options['mobile_width']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Height:
                                     <input type="range" name="mobile_height" min="80" max="300" value="<?php echo esc_attr($options['mobile_height']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['mobile_height']); ?></output> px
+                                    <input type="number" name="mobile_height_text" min="80" max="300" value="<?php echo esc_attr($options['mobile_height']); ?>"
+                                           class="number-input">
                                 </label>
                             </td>
                         </tr>
@@ -694,14 +726,18 @@ class FloatingImageSlider {
 
                                 <label>X Offset:
                                     <input type="range" name="offset_x" min="0" max="200" value="<?php echo esc_attr($options['offset_x']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['offset_x']); ?></output> px
+                                    <input type="number" name="offset_x_text" min="0" max="200" value="<?php echo esc_attr($options['offset_x']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Y Offset:
                                     <input type="range" name="offset_y" min="0" max="200" value="<?php echo esc_attr($options['offset_y']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['offset_y']); ?></output> px
+                                    <input type="number" name="offset_y_text" min="0" max="200" value="<?php echo esc_attr($options['offset_y']); ?>"
+                                           class="number-input">
                                 </label>
                             </td>
                         </tr>
@@ -711,14 +747,18 @@ class FloatingImageSlider {
                             <td>
                                 <label>X Offset:
                                     <input type="range" name="mobile_offset_x" min="0" max="100" value="<?php echo esc_attr($options['mobile_offset_x']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['mobile_offset_x']); ?></output> px
+                                    <input type="number" name="mobile_offset_x_text" min="0" max="100" value="<?php echo esc_attr($options['mobile_offset_x']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Y Offset:
                                     <input type="range" name="mobile_offset_y" min="0" max="100" value="<?php echo esc_attr($options['mobile_offset_y']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['mobile_offset_y']); ?></output> px
+                                    <input type="number" name="mobile_offset_y_text" min="0" max="100" value="<?php echo esc_attr($options['mobile_offset_y']); ?>"
+                                           class="number-input">
                                 </label>
                             </td>
                         </tr>
@@ -733,8 +773,10 @@ class FloatingImageSlider {
 
                                 <label>Size:
                                     <input type="range" name="close_button_size" min="15" max="50" value="<?php echo esc_attr($options['close_button_size']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['close_button_size']); ?></output> px
+                                    <input type="number" name="close_button_size_text" min="15" max="50" value="<?php echo esc_attr($options['close_button_size']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Position:
@@ -746,8 +788,8 @@ class FloatingImageSlider {
                                     </select>
                                 </label><br>
 
-                                <label>Button Text Color: <input type="text" class="wp-color-picker-field" name="close_button_color" value="<?php echo esc_attr($options['close_button_color']); ?>"></label><br>
-                                <label>Button Background Color: <input type="text" class="wp-color-picker-field" name="close_button_bg" value="<?php echo esc_attr($options['close_button_bg']); ?>"></label>
+                                <label>Button Text Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="close_button_color" value="<?php echo esc_attr($options['close_button_color']); ?>"></label><br>
+                                <label>Button Background Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="close_button_bg" value="<?php echo esc_attr($options['close_button_bg']); ?>"></label>
                             </td>
                         </tr>
                     </table>
@@ -813,20 +855,41 @@ class FloatingImageSlider {
 
                                 <label>Slide Duration:
                                     <input type="range" name="slide_duration" min="1000" max="10000" step="500" value="<?php echo esc_attr($options['slide_duration']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['slide_duration']); ?></output> ms
+                                    <input type="number" name="slide_duration_text" min="1000" max="10000" step="500" value="<?php echo esc_attr($options['slide_duration']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Animation Speed:
                                     <input type="range" name="animation_speed" min="200" max="2000" step="100" value="<?php echo esc_attr($options['animation_speed']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['animation_speed']); ?></output> ms
+                                    <input type="number" name="animation_speed_text" min="200" max="2000" step="100" value="<?php echo esc_attr($options['animation_speed']); ?>"
+                                           class="number-input">
                                 </label><br>
 
-                                <label>Delay After Page Load:
-                                    <input type="range" name="delay_after_load" min="0" max="10000" step="500" value="<?php echo esc_attr($options['delay_after_load']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
-                                    <output><?php echo esc_attr($options['delay_after_load']); ?></output> ms
+                                <label>Delay Before First Slide Appears:
+                                    <input type="range" name="delay_before_first_slide_range" min="0" max="10" step="0.5" value="<?php echo esc_attr($options['delay_before_first_slide'] / 1000); ?>"
+                                           oninput="this.nextElementSibling.value = this.value;">
+                                    <output><?php echo esc_attr($options['delay_before_first_slide'] / 1000); ?></output> seconds
+                                    <input type="number" name="delay_before_first_slide_text" min="0" max="10" step="0.5" value="<?php echo esc_attr($options['delay_before_first_slide'] / 1000); ?>"
+                                           class="number-input">
+                                </label>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th scope="row">Image Fit</th>
+                            <td>
+                                <label>How images fill the slider:
+                                    <select name="image_fit">
+                                        <option value="cover" <?php selected($options['image_fit'], 'cover'); ?>>Cover (Crop if needed)</option>
+                                        <option value="contain" <?php selected($options['image_fit'], 'contain'); ?>>Contain (Show full image)</option>
+                                        <option value="fill" <?php selected($options['image_fit'], 'fill'); ?>>Fill (Stretch to fit)</option>
+                                        <option value="none" <?php selected($options['image_fit'], 'none'); ?>>None (Original size, crop if needed)</option>
+                                        <option value="scale-down" <?php selected($options['image_fit'], 'scale-down'); ?>>Scale-Down (Contain or None)</option>
+                                    </select>
                                 </label>
                             </td>
                         </tr>
@@ -846,28 +909,34 @@ class FloatingImageSlider {
 
                                 <label>Border Radius:
                                     <input type="range" name="border_radius" min="0" max="50" value="<?php echo esc_attr($options['border_radius']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['border_radius']); ?></output> px
+                                    <input type="number" name="border_radius_text" min="0" max="50" value="<?php echo esc_attr($options['border_radius']); ?>"
+                                           class="number-input">
                                 </label><br>
 
                                 <label>Border Width:
                                     <input type="range" name="border_width" min="0" max="10" value="<?php echo esc_attr($options['border_width']); ?>"
-                                           oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['border_width']); ?></output> px
+                                    <input type="number" name="border_width_text" min="0" max="10" value="<?php echo esc_attr($options['border_width']); ?>"
+                                           class="number-input">
                                 </label><br>
 
-                                <label>Border Color: <input type="text" class="wp-color-picker-field" name="border_color" value="<?php echo esc_attr($options['border_color']); ?>"></label><br>
+                                <label>Border Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="border_color" value="<?php echo esc_attr($options['border_color']); ?>"></label><br>
                                 <div class="shadow-settings" style="<?php echo (in_array($options['border_theme'], ['shadow', 'fancy-border', 'animated'])) ? '' : 'display: none;'; ?>">
                                     <label>Shadow Blur:
                                         <input type="range" name="shadow_blur" min="0" max="30" value="<?php echo esc_attr($options['shadow_blur']); ?>"
-                                               oninput="this.nextElementSibling.value = this.value">
+                                               oninput="this.nextElementSibling.value = this.value;">
                                     <output><?php echo esc_attr($options['shadow_blur']); ?></output> px
+                                    <input type="number" name="shadow_blur_text" min="0" max="30" value="<?php echo esc_attr($options['shadow_blur']); ?>"
+                                           class="number-input">
                                     </label><br>
-                                    <label>Shadow Color: <input type="text" class="wp-color-picker-field" name="shadow_color" value="<?php echo esc_attr($options['shadow_color']); ?>"></label><br>
+                                    <label>Shadow Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="shadow_color" value="<?php echo esc_attr($options['shadow_color']); ?>"></label><br>
                                 </div>
                                 <div class="gradient-settings" style="<?php echo (in_array($options['border_theme'], ['gradient', 'animated'])) ? '' : 'display: none;'; ?>">
-                                    <label>Gradient Start Color: <input type="text" class="wp-color-picker-field" name="gradient_start" value="<?php echo esc_attr($options['gradient_start']); ?>"></label><br>
-                                    <label>Gradient End Color: <input type="text" class="wp-color-picker-field" name="gradient_end" value="<?php echo esc_attr($options['gradient_end']); ?>"></label>
+                                    <label>Gradient Start Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="gradient_start" value="<?php echo esc_attr($options['gradient_start']); ?>"></label><br>
+                                    <label>Gradient End Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="gradient_end" value="<?php echo esc_attr($options['gradient_end']); ?>"></label>
                                 </div>
                             </td>
                         </tr>
@@ -881,13 +950,17 @@ class FloatingImageSlider {
                                 <div class="overlay-text-settings" style="<?php echo (isset($options['overlay_text_enabled']) && $options['overlay_text_enabled']) ? '' : 'display: none;'; ?>">
                                     <label>Desktop Font Size:
                                         <input type="range" name="overlay_font_size" min="10" max="40" value="<?php echo esc_attr($options['overlay_font_size']); ?>"
-                                               oninput="this.nextElementSibling.value = this.value">
+                                               oninput="this.nextElementSibling.value = this.value;">
                                         <output><?php echo esc_attr($options['overlay_font_size']); ?></output> px
+                                        <input type="number" name="overlay_font_size_text" min="10" max="40" value="<?php echo esc_attr($options['overlay_font_size']); ?>"
+                                               class="number-input">
                                     </label><br>
                                     <label>Mobile Font Size:
                                         <input type="range" name="mobile_overlay_font_size" min="8" max="30" value="<?php echo esc_attr($options['mobile_overlay_font_size']); ?>"
-                                               oninput="this.nextElementSibling.value = this.value">
+                                           oninput="this.nextElementSibling.value = this.value;">
                                         <output><?php echo esc_attr($options['mobile_overlay_font_size']); ?></output> px
+                                        <input type="number" name="mobile_overlay_font_size_text" min="8" max="30" value="<?php echo esc_attr($options['mobile_overlay_font_size']); ?>"
+                                           class="number-input">
                                     </label><br>
 
                                     <label>
@@ -895,9 +968,9 @@ class FloatingImageSlider {
                                         Enable Overlay Background
                                     </label><br>
 
-                                    <label class="overlay-bg-color-label" style="<?php echo (isset($options['overlay_bg_enabled']) && $options['overlay_bg_enabled']) ? '' : 'display: none;'; ?>">Background Color: <input type="text" class="wp-color-picker-field" name="overlay_bg_color" value="<?php echo esc_attr($options['overlay_bg_color']); ?>"></label><br>
+                                    <label class="overlay-bg-color-label" style="<?php echo (isset($options['overlay_bg_enabled']) && $options['overlay_bg_enabled']) ? '' : 'display: none;'; ?>">Background Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="overlay_bg_color" value="<?php echo esc_attr($options['overlay_bg_color']); ?>"></label><br>
 
-                                    <label>Text Color: <input type="text" class="wp-color-picker-field" name="overlay_text_color" value="<?php echo esc_attr($options['overlay_text_color']); ?>"></label><br>
+                                    <label>Text Color: <span class="color-field-label"></span><input type="text" class="wp-color-picker-field" name="overlay_text_color" value="<?php echo esc_attr($options['overlay_text_color']); ?>"></label><br>
 
                                     <label>Text Position:
                                         <select name="overlay_text_position">
@@ -915,13 +988,17 @@ class FloatingImageSlider {
                                     </label><br>
                                     <label>Padding:
                                         <input type="range" name="overlay_padding" min="0" max="30" value="<?php echo esc_attr($options['overlay_padding']); ?>"
-                                               oninput="this.nextElementSibling.value = this.value">
+                                               oninput="this.nextElementSibling.value = this.value;">
                                         <output><?php echo esc_attr($options['overlay_padding']); ?></output> px
+                                        <input type="number" name="overlay_padding_text" min="0" max="30" value="<?php echo esc_attr($options['overlay_padding']); ?>"
+                                               class="number-input">
                                     </label><br>
                                     <label>Border Radius:
                                         <input type="range" name="overlay_border_radius" min="0" max="20" value="<?php echo esc_attr($options['overlay_border_radius']); ?>"
-                                               oninput="this.nextElementSibling.value = this.value">
+                                               oninput="this.nextElementSibling.value = this.value;">
                                         <output><?php echo esc_attr($options['overlay_border_radius']); ?></output> px
+                                        <input type="number" name="overlay_border_radius_text" min="0" max="20" value="<?php echo esc_attr($options['overlay_border_radius']); ?>"
+                                           class="number-input">
                                     </label>
                                 </div>
                             </td>
@@ -956,6 +1033,15 @@ class FloatingImageSlider {
         .form-table label { display: inline-block; margin-bottom: 8px; }
         .form-table input[type="range"] { width: 200px; margin-right: 10px; vertical-align: middle; }
         .form-table output { display: inline-block; width: 30px; text-align: right; vertical-align: middle; }
+        .form-table .number-input {
+            width: 70px; /* Adjusted width for number input */
+            padding: 5px;
+            vertical-align: middle;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            text-align: center;
+        }
 
         /* Toggle Switch */
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
@@ -1018,6 +1104,11 @@ class FloatingImageSlider {
             height: 30px; width: 30px; border-radius: 4px; margin: 0; vertical-align: top;
             box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
         }
+        .color-field-label {
+            display: inline-block;
+            min-width: 15px; /* Adjust as needed for spacing */
+        }
+
 
         /* Save feedback message */
         #settings-save-feedback {
@@ -1153,6 +1244,44 @@ class FloatingImageSlider {
             }
             updateImageIndices(); // Initial call to ensure existing items are correctly indexed
 
+            // Sync range and number inputs
+            $(document).on('input', 'input[type="range"]', function() {
+                var associatedNumberInput = $(this).nextAll('input[type="number"]').first();
+                var isDelayInput = $(this).attr('name') === 'delay_before_first_slide_range';
+
+                if (associatedNumberInput.length) {
+                    if (isDelayInput) {
+                        // For delay, display seconds with one decimal
+                        associatedNumberInput.val(parseFloat($(this).val()).toFixed(1));
+                    } else {
+                        associatedNumberInput.val($(this).val());
+                    }
+                }
+            });
+
+            $(document).on('input', 'input[type="number"]', function() {
+                var associatedRangeInput = $(this).prevAll('input[type="range"]').first();
+                var isDelayInput = $(this).attr('name') === 'delay_before_first_slide_text';
+
+                if (associatedRangeInput.length) {
+                    var val = parseFloat($(this).val()); // Use parseFloat for decimal values
+                    var min = parseFloat(associatedRangeInput.attr('min'));
+                    var max = parseFloat(associatedRangeInput.attr('max'));
+                    
+                    if (isNaN(val) || val < min) {
+                        val = min;
+                    } else if (val > max) {
+                        val = max;
+                    }
+                    associatedRangeInput.val(val);
+                    if (isDelayInput) {
+                        // For delay, format the displayed number to one decimal
+                        $(this).val(val.toFixed(1));
+                    }
+                }
+            });
+
+
             // Handle saving settings via AJAX
             $('#floating-slider-settings-form').on('submit', function(e) {
                 e.preventDefault();
@@ -1251,41 +1380,48 @@ class FloatingImageSlider {
         $options['display_pages'] = sanitize_text_field($_POST['display_pages']);
         $options['specific_pages'] = isset($_POST['specific_pages']) && is_array($_POST['specific_pages']) ? array_map('intval', $_POST['specific_pages']) : array();
 
-        $options['width'] = intval($_POST['width']);
-        $options['height'] = intval($_POST['height']);
-        $options['mobile_width'] = intval($_POST['mobile_width']);
-        $options['mobile_height'] = intval($_POST['mobile_height']);
+        // Use the numerical input values if available, fallback to range if only range is present
+        $options['width'] = isset($_POST['width_text']) ? intval($_POST['width_text']) : (isset($_POST['width']) ? intval($_POST['width']) : $options['width']);
+        $options['height'] = isset($_POST['height_text']) ? intval($_POST['height_text']) : (isset($_POST['height']) ? intval($_POST['height']) : $options['height']);
+        $options['mobile_width'] = isset($_POST['mobile_width_text']) ? intval($_POST['mobile_width_text']) : (isset($_POST['mobile_width']) ? intval($_POST['mobile_width']) : $options['mobile_width']);
+        $options['mobile_height'] = isset($_POST['mobile_height_text']) ? intval($_POST['mobile_height_text']) : (isset($_POST['mobile_height']) ? intval($_POST['mobile_height']) : $options['mobile_height']);
 
         $options['position_x'] = sanitize_text_field($_POST['position_x']);
         $options['position_y'] = sanitize_text_field($_POST['position_y']);
-        $options['offset_x'] = intval($_POST['offset_x']);
-        $options['offset_y'] = intval($_POST['offset_y']);
-        $options['mobile_offset_x'] = intval($_POST['mobile_offset_x']);
-        $options['mobile_offset_y'] = intval($_POST['mobile_offset_y']);
+        $options['offset_x'] = isset($_POST['offset_x_text']) ? intval($_POST['offset_x_text']) : (isset($_POST['offset_x']) ? intval($_POST['offset_x']) : $options['offset_x']);
+        $options['offset_y'] = isset($_POST['offset_y_text']) ? intval($_POST['offset_y_text']) : (isset($_POST['offset_y']) ? intval($_POST['offset_y']) : $options['offset_y']);
+        $options['mobile_offset_x'] = isset($_POST['mobile_offset_x_text']) ? intval($_POST['mobile_offset_x_text']) : (isset($_POST['mobile_offset_x']) ? intval($_POST['mobile_offset_x']) : $options['mobile_offset_x']);
+        $options['mobile_offset_y'] = isset($_POST['mobile_offset_y_text']) ? intval($_POST['mobile_offset_y_text']) : (isset($_POST['mobile_offset_y']) ? intval($_POST['mobile_offset_y']) : $options['mobile_offset_y']);
 
-        $options['close_button_size'] = intval($_POST['close_button_size']);
+        $options['close_button_size'] = isset($_POST['close_button_size_text']) ? intval($_POST['close_button_size_text']) : (isset($_POST['close_button_size']) ? intval($_POST['close_button_size']) : $options['close_button_size']);
         $options['close_button_position'] = sanitize_text_field($_POST['close_button_position']);
         $options['close_button_color'] = sanitize_hex_color($_POST['close_button_color']);
         $options['close_button_bg'] = sanitize_hex_color($_POST['close_button_bg']);
 
         // Design & Animation
         $options['slide_animation'] = sanitize_text_field($_POST['slide_animation']);
-        $options['slide_duration'] = intval($_POST['slide_duration']);
-        $options['animation_speed'] = intval($_POST['animation_speed']);
-        $options['delay_after_load'] = intval($_POST['delay_after_load']);
+        $options['slide_duration'] = isset($_POST['slide_duration_text']) ? intval($_POST['slide_duration_text']) : (isset($_POST['slide_duration']) ? intval($_POST['slide_duration']) : $options['slide_duration']);
+        $options['animation_speed'] = isset($_POST['animation_speed_text']) ? intval($_POST['animation_speed_text']) : (isset($_POST['animation_speed']) ? intval($_POST['animation_speed']) : $options['animation_speed']);
+        
+        // Convert seconds to milliseconds for delay_before_first_slide
+        $delay_seconds = isset($_POST['delay_before_first_slide_text']) ? floatval($_POST['delay_before_first_slide_text']) : (isset($_POST['delay_before_first_slide_range']) ? floatval($_POST['delay_before_first_slide_range']) : ($options['delay_before_first_slide'] / 1000));
+        $options['delay_before_first_slide'] = intval($delay_seconds * 1000);
 
         $options['border_theme'] = sanitize_text_field($_POST['border_theme']);
-        $options['border_radius'] = intval($_POST['border_radius']);
+        $options['border_radius'] = isset($_POST['border_radius_text']) ? intval($_POST['border_radius_text']) : (isset($_POST['border_radius']) ? intval($_POST['border_radius']) : $options['border_radius']);
         $options['border_color'] = sanitize_hex_color($_POST['border_color']);
-        $options['border_width'] = intval($_POST['border_width']);
-        $options['shadow_blur'] = intval($_POST['shadow_blur']);
+        $options['border_width'] = isset($_POST['border_width_text']) ? intval($_POST['border_width_text']) : (isset($_POST['border_width']) ? intval($_POST['border_width']) : $options['border_width']);
+        $options['shadow_blur'] = isset($_POST['shadow_blur_text']) ? intval($_POST['shadow_blur_text']) : (isset($_POST['shadow_blur']) ? intval($_POST['shadow_blur']) : $options['shadow_blur']);
         $options['shadow_color'] = sanitize_hex_color($_POST['shadow_color']);
         $options['gradient_start'] = sanitize_hex_color($_POST['gradient_start']);
         $options['gradient_end'] = sanitize_hex_color($_POST['gradient_end']);
 
+        // New: Image Fit
+        $options['image_fit'] = sanitize_text_field($_POST['image_fit']);
+
         // Overlay Text Styling
-        $options['overlay_font_size'] = intval($_POST['overlay_font_size']);
-        $options['mobile_overlay_font_size'] = intval($_POST['mobile_overlay_font_size']);
+        $options['overlay_font_size'] = isset($_POST['overlay_font_size_text']) ? intval($_POST['overlay_font_size_text']) : (isset($_POST['overlay_font_size']) ? intval($_POST['overlay_font_size']) : $options['overlay_font_size']);
+        $options['mobile_overlay_font_size'] = isset($_POST['mobile_overlay_font_size_text']) ? intval($_POST['mobile_overlay_font_size_text']) : (isset($_POST['mobile_overlay_font_size']) ? intval($_POST['mobile_overlay_font_size']) : $options['mobile_overlay_font_size']);
         $options['overlay_text_color'] = sanitize_hex_color($_POST['overlay_text_color']);
         
         $overlay_bg_color = sanitize_text_field($_POST['overlay_bg_color']);
@@ -1297,49 +1433,55 @@ class FloatingImageSlider {
 
         $options['overlay_text_position'] = sanitize_text_field($_POST['overlay_text_position']);
         $options['overlay_text_alignment'] = sanitize_text_field($_POST['overlay_text_alignment']);
-        $options['overlay_padding'] = intval($_POST['overlay_padding']);
-        $options['overlay_border_radius'] = intval($_POST['overlay_border_radius']);
+        $options['overlay_padding'] = isset($_POST['overlay_padding_text']) ? intval($_POST['overlay_padding_text']) : (isset($_POST['overlay_padding']) ? intval($_POST['overlay_padding']) : $options['overlay_padding']);
+        $options['overlay_border_radius'] = isset($_POST['overlay_border_radius_text']) ? intval($_POST['overlay_border_radius_text']) : (isset($_POST['overlay_border_radius']) ? intval($_POST['overlay_border_radius']) : $options['overlay_border_radius']);
 
         // Process images directly as they come from the form, relying on JS for order
         $processed_images = [];
         if (isset($_POST['images']) && is_array($_POST['images'])) {
-            // Because jQuery Sortable renames the elements' 'name' attribute
-            // to match the current order (e.g., images[0][url], images[1][url]),
-            // $_POST['images'] will already be in the correct order.
-            // We just need to iterate and sanitize.
+            // Sort images by the 'order' field if it exists, otherwise keep natural order
+            $ordered_images = [];
             foreach ($_POST['images'] as $image_data) {
                 $url = isset($image_data['url']) ? esc_url_raw($image_data['url']) : '';
                 $link = isset($image_data['link']) ? esc_url_raw($image_data['link']) : '';
                 $overlay_text = isset($image_data['overlay_text']) ? wp_kses_post($image_data['overlay_text']) : '';
 
                 if (!empty($url)) {
-                    $processed_images[] = array(
-                        'url' => $url,
-                        'link' => $link,
-                        'overlay_text' => $overlay_text
-                    );
+                    // Use the 'order' field from the form for sorting
+                    if (isset($image_data['order']) && is_numeric($image_data['order'])) {
+                        $ordered_images[intval($image_data['order'])] = array(
+                            'url' => $url,
+                            'link' => $link,
+                            'overlay_text' => $overlay_text
+                        );
+                    } else {
+                        // Fallback if 'order' is missing (should not happen with updated JS)
+                        $ordered_images[] = array(
+                            'url' => $url,
+                            'link' => $link,
+                            'overlay_text' => $overlay_text
+                        );
+                    }
                 }
             }
+            ksort($ordered_images); // Sort by keys (the 'order' values)
+            $options['images'] = array_values($ordered_images); // Re-index array after sorting
         }
-        $options['images'] = $processed_images; // Assign the sanitized and ordered array
-
-        // Attempt to update the option
+        
         $updated = update_option('floating_slider_options', $options);
 
         if ($updated) {
             echo '<div class="notice notice-success is-dismissible"><p>Settings saved successfully!</p></div>';
         } else {
-            // Check if the options are identical, meaning no update was needed
             $current_options = get_option('floating_slider_options', $this->get_default_options());
             if ($current_options === $options) {
                 echo '<div class="notice notice-info is-dismissible"><p>Settings are already up to date (no changes detected).</p></div>';
             } else {
-                // This means update_option failed for another reason (e.g., database error)
                 echo '<div class="notice notice-error"><p>Error: Settings could not be saved. Please check your database permissions or try again.</p></div>';
             }
         }
         
-        wp_die(); // Always call wp_die() in AJAX callbacks
+        wp_die();
     }
 }
 
