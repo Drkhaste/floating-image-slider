@@ -3,7 +3,7 @@
  * Plugin Name: Floating Image Slider
  * Description: A customizable floating image slider widget that can be displayed on any page with full admin control
  * Version: 2.0.13
- * Author: BTC
+ * Author: DrKhaste
  */
 
 // Prevent direct access
